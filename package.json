@@ -1,0 +1,136 @@
+{
+  "name": "quran-pt2",
+  "author": "Aymane Taibi",
+  "version": "2.0.0",
+  "keywords": [
+    "pebble-app"
+  ],
+  "private": true,
+  "dependencies": {},
+  "pebble": {
+    "displayName": "Quran",
+    "uuid": "cda58919-a3ce-4b12-a923-8b34e191777e",
+    "sdkVersion": "3",
+    "manifestVersion": 2,
+    "usesPermissions": [
+      {
+        "name": "Internet",
+        "parameters": {
+          "domains": [
+            "cdn.jsdelivr.net",
+            "raw.githubusercontent.com"
+          ]
+        }
+      }
+    ],
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "emery"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "capabilities": [
+      "configurable"
+    ],
+    "messageKeys": [
+      "CMD",
+      "REQ",
+      "ZOOM",
+      "AYAH",
+      "LINE",
+      "COUNT",
+      "FLAGS",
+      "VER",
+      "DATA",
+      "TEXT",
+      "TEXT2",
+      "WIDTH"
+    ],
+    "resources": {
+      "media": [
+        {
+          "type": "raw",
+          "name": "DATA_TEXT",
+          "file": "data/TEXT.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_LEX",
+          "file": "data/LEX.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_TUP15",
+          "file": "data/TUP15.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_TUP20",
+          "file": "data/TUP20.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_TUP26",
+          "file": "data/TUP26.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_TUP28",
+          "file": "data/TUP28.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_TUP32",
+          "file": "data/TUP32.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_ATL15",
+          "file": "data/ATL15.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_ATL20",
+          "file": "data/ATL20.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_ATL26",
+          "file": "data/ATL26.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_ATL28",
+          "file": "data/ATL28.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_ATL32",
+          "file": "data/ATL32.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_META",
+          "file": "data/META.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_LINES",
+          "file": "data/LINES.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_NAMES",
+          "file": "data/NAMES.bin"
+        },
+        {
+          "type": "bitmap",
+          "name": "APP_ICON",
+          "file": "images/icon.png",
+          "menuIcon": true
+        }
+      ]
+    }
+  }
+}

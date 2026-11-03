@@ -1,0 +1,25 @@
+# previous version, kept locally only
+.old/
+
+# build output (pebble build / waf)
+build/
+.lock-waf*
+.waf*
+*.pbw
+compile_commands.json
+
+# tooling caches
+node_modules/
+__pycache__/
+*.pyc
+
+# editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Generated files that ARE committed on purpose (CloudPebble may build without
+# running tools/): src/pkjs/data_blob.js, src/c/data_version.h,
+# src/pkjs/arabic_blob.js, src/c/names_ar.c, resources/data/LINES.bin, NAMES.bin
