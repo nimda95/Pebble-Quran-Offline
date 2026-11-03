@@ -68,7 +68,7 @@ bool ui_system_arabic_available(void) {
 static Window *s_dlg;
 static TextLayer *s_dlg_title, *s_dlg_body;
 static ScrollLayer *s_dlg_scroll;
-static char s_dlg_title_buf[40], s_dlg_body_buf[300];
+static char s_dlg_title_buf[64], s_dlg_body_buf[300];
 
 static void dlg_close(ClickRecognizerRef r, void *c) { window_stack_remove(s_dlg, true); }
 static void dlg_clicks(void *c) {

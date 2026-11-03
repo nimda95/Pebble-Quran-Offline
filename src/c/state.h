@@ -40,12 +40,13 @@ typedef struct __attribute__((packed)) {
 
 extern Settings g_set;
 extern Position g_pos;
+extern uint8_t g_lang;                   // UI language (LANG_* in i18n_ids.h), own persist key
 
 void state_load(void);
-void state_save_settings(void);
+void state_save_settings(void);          // g_set and g_lang
 void state_save_position(void);
 void state_save_position_soon(void);     // debounced
-void settings_reset(void);               // defaults; keeps position and bookmarks
+void settings_reset(void);               // defaults (language too); keeps position and bookmarks
 void state_sanitize(void);               // clamp every field to its valid range
 
 // Crash detection: returns true if the previous run did not exit cleanly.

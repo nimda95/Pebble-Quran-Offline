@@ -45,7 +45,8 @@
       "DATA",
       "TEXT",
       "TEXT2",
-      "WIDTH"
+      "WIDTH",
+      "LANG"
     ],
     "resources": {
       "media": [
@@ -123,6 +124,11 @@
           "type": "raw",
           "name": "DATA_NAMES",
           "file": "data/NAMES.bin"
+        },
+        {
+          "type": "raw",
+          "name": "DATA_LANG",
+          "file": "data/LANG.bin"
         },
         {
           "type": "bitmap",

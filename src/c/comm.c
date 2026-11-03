@@ -47,6 +47,7 @@ void comm_send_settings(void) {
   DictionaryIterator *it;
   if (!begin(&it, CMD_SETTINGS)) { s_settings_pending = true; return; }
   dict_write_data(it, MESSAGE_KEY_DATA, (const uint8_t *)&g_set, sizeof(g_set));
+  dict_write_uint8(it, MESSAGE_KEY_LANG, g_lang);
   if (app_message_outbox_send() != APP_MSG_OK) s_settings_pending = true;
   else s_settings_pending = false;
 }
@@ -114,16 +115,19 @@ static void inbox(DictionaryIterator *it, void *ctx) {
       break;
     }
     case CMD_SETTINGS: {
+      bool changed = false;
       Tuple *td = dict_find(it, MESSAGE_KEY_DATA);
       if (td && td->length >= sizeof(Settings)) {
         Settings s;
         memcpy(&s, td->value->data, sizeof(s));
-        if (s.version == SETTINGS_VERSION) {
-          g_set = s;
-          state_sanitize();
-          state_save_settings();
-          if (s_settings_cb) s_settings_cb();
-        }
+        if (s.version == SETTINGS_VERSION) { g_set = s; changed = true; }
+      }
+      Tuple *tl = dict_find(it, MESSAGE_KEY_LANG);      // UI language, sent beside the Settings bytes
+      if (tl) { g_lang = (uint8_t)tu32(tl); changed = true; }
+      if (changed) {
+        state_sanitize();
+        state_save_settings();
+        if (s_settings_cb) s_settings_cb();
       }
       break;
     }

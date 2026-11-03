@@ -1,7 +1,8 @@
 /* Pebble Quran: phone side (PebbleKit JS inside the Pebble app).
  *  - renders text lines for the watch (same renderer and data as the watch)
  *  - fetches the Arabic text (system-font view) and translations
- *  - hosts the settings page (no web hosting needed: it is a data: URL)
+ *  - hosts the settings page (no web hosting needed: it is a data: URL), in the
+ *    UI language chosen there (lang/*.json)
  * ES5 only. */
 var R = require('./render');
 var BLOB = require('./data_blob');
@@ -57,7 +58,17 @@ function saveSettings(bytes) {
   try { localStorage.setItem('settings', JSON.stringify(bytes)); } catch (e) { /* ignore */ }
 }
 
+// UI language (0 = automatic), kept beside the Settings bytes
+function loadLang() {
+  try { return parseInt(localStorage.getItem('lang'), 10) || 0; } catch (e) { return 0; }
+}
+
+function saveLang(v) {
+  try { localStorage.setItem('lang', String(v)); } catch (e) { /* ignore */ }
+}
+
 var settings = loadSettings();
+var lang = loadLang();
 
 // ------------------------------------------------------------------ lines
 var job = null;                 // { req, zoom, g, l, left }
@@ -251,19 +262,22 @@ Pebble.addEventListener('appmessage', function (e) {
         settings = Array.prototype.slice.call(d.DATA, 0, SETTINGS_LEN);
         saveSettings(settings);
       }
+      if (typeof d.LANG === 'number') { lang = d.LANG; saveLang(lang); }
       break;
   }
 });
 
 Pebble.addEventListener('showConfiguration', function () {
-  Pebble.openURL(config.url(settings || config.defaults()));
+  Pebble.openURL(config.url(settings || config.defaults(), lang));
 });
 
 Pebble.addEventListener('webviewclosed', function (e) {
   if (!e || !e.response) return;
-  var bytes = config.parse(e.response, settings || config.defaults());
-  if (!bytes) return;
-  settings = bytes;
-  saveSettings(bytes);
-  send({ CMD: CMD.SETTINGS, DATA: bytes });
+  var r = config.parse(e.response, settings || config.defaults(), lang);
+  if (!r) return;
+  settings = r.bytes;
+  lang = r.lang;
+  saveSettings(settings);
+  saveLang(lang);
+  send({ CMD: CMD.SETTINGS, DATA: settings, LANG: lang });
 });

@@ -1,11 +1,13 @@
 #include "state.h"
 #include "qdata.h"
+#include "i18n.h"
 
 // Persist keys (the whole app must stay under 4 KB of persisted data).
 #define KEY_SETTINGS 10
 #define KEY_POSITION 11
 #define KEY_BOOKMARKS 12
 #define KEY_RUN 13
+#define KEY_LANG 14             // UI language, one byte (added after 2.0)
 // Version 1 keys, migrated once and deleted.
 #define OLD_KEY_STATE 1
 #define OLD_KEY_BOOKMARKS 2
@@ -14,6 +16,7 @@
 
 Settings g_set;
 Position g_pos;
+uint8_t g_lang;
 
 typedef struct __attribute__((packed)) {
   uint8_t count;
@@ -44,6 +47,7 @@ static void defaults(void) {
   g_set.glance = 1;
   g_set.paper = 0xFE;     // pastel yellow
   g_set.ink = 0xC4;       // dark green
+  g_lang = LANG_AUTO;
 }
 
 void state_sanitize(void) {
@@ -57,6 +61,7 @@ void state_sanitize(void) {
   if (g_set.sysfont >= SYSFONT_N) g_set.sysfont = 1;
   if (g_set.trans >= TRANS_N) g_set.trans = 1;
   if (g_set.glance > 1) g_set.glance = 1;
+  if (g_lang >= LANG_N) g_lang = LANG_AUTO;
   g_set.paper |= 0xC0; g_set.ink |= 0xC0;
   if (g_set.paper == g_set.ink) g_set.ink = (uint8_t)(g_set.paper ^ 0x3F);
   if (g_pos.ayah >= QD_N_AYAH) { g_pos.ayah = 0; g_pos.line = 0; }
@@ -109,6 +114,7 @@ void state_load(void) {
   } else if (persist_exists(OLD_KEY_STATE) || persist_exists(OLD_KEY_BOOKMARKS)) {
     migrate_v1();
   }
+  if (persist_exists(KEY_LANG)) persist_read_data(KEY_LANG, &g_lang, sizeof(g_lang));
   if (persist_exists(KEY_POSITION)) persist_read_data(KEY_POSITION, &g_pos, sizeof(g_pos));
   if (persist_exists(KEY_BOOKMARKS)) persist_read_data(KEY_BOOKMARKS, &s_bm, sizeof(s_bm));
 
@@ -139,7 +145,10 @@ void state_mark_clean_exit(void) {
   persist_write_data(KEY_RUN, &s_run, sizeof(s_run));
 }
 
-void state_save_settings(void) { persist_write_data(KEY_SETTINGS, &g_set, sizeof(g_set)); }
+void state_save_settings(void) {
+  persist_write_data(KEY_SETTINGS, &g_set, sizeof(g_set));
+  persist_write_data(KEY_LANG, &g_lang, sizeof(g_lang));
+}
 void state_save_position(void) { persist_write_data(KEY_POSITION, &g_pos, sizeof(g_pos)); }
 
 static void save_cb(void *d) { s_save_timer = NULL; state_save_position(); }
@@ -183,9 +192,10 @@ void bookmark_remove(int i) {
 
 // ---------------------------------------------------------------- names
 static const uint32_t LIGHT_RGB[LIGHT_N] = { 0, 0xFFD9A0, 0xFFA030, 0xFF2000, 0x40FF60, 0x4080FF };
-static const char *LIGHT_NAMES[LIGHT_N] = { "Default", "Warm white", "Amber", "Red", "Green", "Blue" };
-static const char *THEME_NAMES[THEME_N] = { "Light", "Dark", "Night (red)", "Night (amber)", "Sepia (cream)",
-                                            "Midnight blue", "Custom (phone)" };
+static const uint16_t LIGHT_NAMES[LIGHT_N] = { S_LIGHT_DEFAULT, S_LIGHT_WARM, S_LIGHT_AMBER, S_LIGHT_RED,
+                                              S_LIGHT_GREEN, S_LIGHT_BLUE };
+static const uint16_t THEME_NAMES[THEME_N] = { S_THEME_LIGHT, S_THEME_DARK, S_THEME_NIGHT_RED, S_THEME_NIGHT_AMBER,
+                                              S_THEME_SEPIA, S_THEME_MIDNIGHT, S_THEME_CUSTOM };
 // paper, ink per preset (GColor8 argb: 0b11rrggbb)
 static const uint8_t THEME_COLORS[THEME_N - 1][2] = {
   { 0xFF, 0xC0 },   // white / black
@@ -200,16 +210,19 @@ void theme_colors(int t, uint8_t *paper, uint8_t *ink) {
   if (t < 0 || t >= THEME_N) t = THEME_LIGHT;
   *paper = THEME_COLORS[t][0]; *ink = THEME_COLORS[t][1];
 }
-static const char *HEADER_NAMES[HEADER_N] = { "Off", "Surah & ayah", "Surah, ayah & juz'", "Clock" };
+static const uint16_t HEADER_NAMES[HEADER_N] = { S_OFF, S_HEADER_POS, S_HEADER_POS_JUZ, S_HEADER_CLOCK };
 
 static const char *TRANS_NAMES[TRANS_N] = {
-  "None", "English: Sahih Intl.", "English: M. Khattab", "English: Abdel Haleem", "English: Yusuf Ali",
+  NULL, "English: Sahih Intl.", "English: M. Khattab", "English: Abdel Haleem", "English: Yusuf Ali",
   "French: Hamidullah", "German: Bubenheim", "Spanish: Isa Garcia", "Turkish: Diyanet",
   "Indonesian: Kemenag", "Malay: Basmeih", "Dutch: Siregar", "Italian: Piccardo",
   "Portuguese: El Hayek", "Bosnian: Korkut" };
-const char *trans_name(int i) { return (i >= 0 && i < TRANS_N) ? TRANS_NAMES[i] : ""; }
+const char *trans_name(int i) {
+  if (i == 0) return _(S_TRANS_NONE);
+  return (i > 0 && i < TRANS_N) ? TRANS_NAMES[i] : "";
+}
 
 uint32_t light_rgb(int p) { return (p >= 0 && p < LIGHT_N) ? LIGHT_RGB[p] : 0; }
-const char *light_name(int p) { return (p >= 0 && p < LIGHT_N) ? LIGHT_NAMES[p] : ""; }
-const char *theme_name(int t) { return (t >= 0 && t < THEME_N) ? THEME_NAMES[t] : ""; }
-const char *header_name(int h) { return (h >= 0 && h < HEADER_N) ? HEADER_NAMES[h] : ""; }
+const char *light_name(int p) { return (p >= 0 && p < LIGHT_N) ? _(LIGHT_NAMES[p]) : ""; }
+const char *theme_name(int t) { return (t >= 0 && t < THEME_N) ? _(THEME_NAMES[t]) : ""; }
+const char *header_name(int h) { return (h >= 0 && h < HEADER_N) ? _(HEADER_NAMES[h]) : ""; }

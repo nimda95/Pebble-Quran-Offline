@@ -22,4 +22,5 @@ Thumbs.db
 
 # Generated files that ARE committed on purpose (CloudPebble may build without
 # running tools/): src/pkjs/data_blob.js, src/c/data_version.h,
-# src/pkjs/arabic_blob.js, src/c/names_ar.c, resources/data/LINES.bin, NAMES.bin
+# src/pkjs/arabic_blob.js, src/c/names_ar.c, resources/data/LINES.bin, NAMES.bin,
+# resources/data/LANG.bin, src/c/i18n_ids.h, src/pkjs/i18n_data.js

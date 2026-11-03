@@ -4,6 +4,7 @@
 #include "qdata.h"
 #include "ui.h"
 #include "strips.h"
+#include "i18n.h"
 
 #define TV_MARGIN 6
 #define REQ_TIMEOUT_MS 8000
@@ -40,13 +41,13 @@ static int place(TextLayer *t, int y, GFont f, GTextAlignment al, const char *te
 
 static void render(void) {
   int si = qmeta_surah_of(s_ayah);
-  snprintf(s_ref_buf, sizeof(s_ref_buf), "%s  %d:%d", qmeta_surah(si)->translit, si + 1, qmeta_ayah_no(s_ayah));
+  snprintf(s_ref_buf, sizeof(s_ref_buf), "%s  %d:%d", i18n_surah_name(si), si + 1, qmeta_ayah_no(s_ayah));
   const char *tr;
   if (have(&s_shown, s_ayah) && s_shown.text) tr = s_shown.text;
-  else if (have(&s_shown, s_ayah)) tr = "Could not load the translation. Check the phone's internet connection.";
-  else if (!g_set.trans) tr = "No translation selected. Choose one in Settings.";
-  else if (!comm_phone_ready()) tr = "Translations need the phone connected.";
-  else tr = "Loading\xe2\x80\xa6";
+  else if (have(&s_shown, s_ayah)) tr = _(S_TR_ERROR);
+  else if (!g_set.trans) tr = _(S_TR_NONE);
+  else if (!comm_phone_ready()) tr = _(S_TR_NEED_PHONE);
+  else tr = _(S_LOADING);
   int y = place(s_ref, 2, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD), GTextAlignmentCenter, s_ref_buf);
   y = place(s_tr, y, fonts_get_system_font(FONT_KEY_GOTHIC_24), GTextAlignmentLeft, tr);
   GRect b = layer_get_bounds(window_get_root_layer(s_win));

@@ -21,6 +21,8 @@ def build(ctx):
     # version into a C header) before the JS bundle is assembled.
     root = ctx.path.abspath()
     subprocess.check_call([sys.executable, os.path.join(root, 'tools', 'gen_js_data.py')])
+    # UI translations: lang/*.json -> LANG.bin resource, C string ids, page strings.
+    subprocess.check_call([sys.executable, os.path.join(root, 'tools', 'gen_lang.py')])
 
     binaries = []
     for p in ctx.env.TARGET_PLATFORMS:

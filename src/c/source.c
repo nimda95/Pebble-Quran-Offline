@@ -5,6 +5,7 @@
 #include "qdata.h"
 #include "qrender.h"
 #include "profile.h"
+#include "i18n.h"
 
 #define URGENT_TIMEOUT_MS 2500       // phone silent this long -> watch renders the page
 #define PREFETCH_TIMEOUT_MS 5000
@@ -317,10 +318,10 @@ bool source_using_phone(void) { return s_phone; }
 bool source_failed(void) { return s_engine_failed && !s_phone; }
 
 const char *source_status(void) {
-  if (g_set.render == RENDER_WATCH) return "Watch (phone off)";
-  if (comm_phone_ready()) return time(NULL) < s_local_until ? "Watch (phone slow)" : "Phone";
-  if (comm_phone_connected()) return "Watch (phone app silent)";
-  return "Watch (no phone)";
+  if (g_set.render == RENDER_WATCH) return _(S_SRC_PHONE_OFF);
+  if (comm_phone_ready()) return _(time(NULL) < s_local_until ? S_SRC_PHONE_SLOW : S_SRC_PHONE);
+  if (comm_phone_connected()) return _(S_SRC_APP_SILENT);
+  return _(S_SRC_NO_PHONE);
 }
 
 void source_counts(uint32_t *p, uint32_t *w) { *p = s_n_phone; *w = s_n_local; }

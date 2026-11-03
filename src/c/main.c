@@ -7,13 +7,14 @@
 #include "strips.h"
 #include "ui.h"
 #include "textview.h"
+#include "i18n.h"
 
 static char s_glance_buf[48];
 
 static void glance_cb(AppGlanceReloadSession *session, size_t limit, void *ctx) {
   if (!g_set.glance || limit < 1) return;
   int si = qmeta_surah_of(g_pos.ayah);
-  snprintf(s_glance_buf, sizeof(s_glance_buf), "%s %d:%d", qmeta_surah(si)->translit, si + 1,
+  snprintf(s_glance_buf, sizeof(s_glance_buf), "%s %d:%d", i18n_surah_name(si), si + 1,
            qmeta_ayah_no(g_pos.ayah));
   AppGlanceSlice slice = {
     .layout = { .icon = APP_GLANCE_SLICE_DEFAULT_ICON, .subtitle_template_string = s_glance_buf },
@@ -29,6 +30,7 @@ static void on_phone(void) {
 }
 
 static void on_phone_settings(void) {
+  i18n_update();
   reader_settings_changed();
   textview_settings_changed();
   main_menu_refresh();
@@ -38,6 +40,8 @@ static void init(void) {
   bool data_ok = qmeta_init();
   if (!data_ok) APP_LOG(APP_LOG_LEVEL_ERROR, "data resources missing or damaged");
   state_load();
+  i18n_update();
+  if (!i18n_ready()) data_ok = false;
   strips_set_theme(g_set.theme);
   if (ui_touch_api()) app_touch_navigation_enable(true);   // menus follow the system touch setting
   comm_init();
@@ -46,12 +50,13 @@ static void init(void) {
   // Always start on the menu: a problem on some page can never lock the app.
   main_menu_push();
   if (!data_ok) {
-    ui_dialog_show("Data missing", "The Quran data in this app is damaged. Please reinstall the app.");
+    // English if even the strings are missing
+    ui_dialog_show(i18n_ready() ? _(S_DATA_MISSING) : "Data missing",
+                   i18n_ready() ? _(S_DATA_MISSING_BODY)
+                                : "The Quran data in this app is damaged. Please reinstall the app.");
   } else if (state_crashed_last_time()) {
     vibes_short_pulse();
-    ui_dialog_show("Settings reset",
-                   "Quran closed unexpectedly last time, so its settings were reset to the defaults. "
-                   "Your reading position and bookmarks were kept.");
+    ui_dialog_show(_(S_RESET_TITLE), _(S_RESET_BODY));
   }
 }
 

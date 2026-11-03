@@ -10,6 +10,7 @@
 #include "comm.h"
 #include "profile.h"
 #include "qrender.h"
+#include "i18n.h"
 
 #define MAX_VIS 16
 #define SYS_WAIT_MS 2500             // system-font text this late -> our glyphs for this page
@@ -20,7 +21,7 @@ static Window *s_win;
 static Layer *s_page, *s_text;
 static TextLayer *s_hdr;
 static StatusBarLayer *s_sb;
-static char s_hdr_buf[48];
+static char s_hdr_buf[64];
 
 static int s_zoom, s_vis = 1, s_pitch = 1, s_text_top, s_hdr_h;
 static LinePos s_top;
@@ -98,12 +99,15 @@ static void update_header(void) {
   if (g_set.header == HEADER_POSITION || g_set.header == HEADER_POSITION_JUZ) {
     int si = qmeta_surah_of(s_top.g);
     const char *bm = bookmark_find(s_top.g) >= 0 ? " \xe2\x80\xa2" : "";
-    if (g_set.header == HEADER_POSITION_JUZ)
-      snprintf(s_hdr_buf, sizeof(s_hdr_buf), "%s %d:%d  Juz' %d%s", qmeta_surah(si)->translit, si + 1,
-               qmeta_ayah_no(s_top.g), qmeta_juz_of(s_top.g) + 1, bm);
-    else
-      snprintf(s_hdr_buf, sizeof(s_hdr_buf), "%s  %d:%d%s", qmeta_surah(si)->translit, si + 1,
+    if (g_set.header == HEADER_POSITION_JUZ) {
+      char juz[24];
+      snprintf(juz, sizeof(juz), _(S_JUZ_N), qmeta_juz_of(s_top.g) + 1);
+      snprintf(s_hdr_buf, sizeof(s_hdr_buf), "%s %d:%d  %s%s", i18n_surah_name(si), si + 1,
+               qmeta_ayah_no(s_top.g), juz, bm);
+    } else {
+      snprintf(s_hdr_buf, sizeof(s_hdr_buf), "%s  %d:%d%s", i18n_surah_name(si), si + 1,
                qmeta_ayah_no(s_top.g), bm);
+    }
     text_layer_set_text(s_hdr, s_hdr_buf);
   }
 }
@@ -143,7 +147,7 @@ static void page_update(Layer *layer, GContext *ctx) {
       if (missing[k]) dots(ctx, b.size.w / 2, s_text_top + k * s_pitch + s_pitch / 2);
     if (s_mem_error || source_failed()) {
       graphics_context_set_text_color(ctx, ui_fg());
-      graphics_draw_text(ctx, "Not enough memory", fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
+      graphics_draw_text(ctx, _(S_NOT_ENOUGH_MEMORY), fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
                          GRect(0, b.size.h / 2 - 12, b.size.w, 24), GTextOverflowModeTrailingEllipsis,
                          GTextAlignmentCenter, NULL);
     }
@@ -247,8 +251,8 @@ static void on_swipe(const Recognizer *r, RecognizerEvent ev) {
 enum { ACT_BOOKMARK = 1, ACT_TRANSLATION, ACT_FONT, ACT_GOTO_AYAH, ACT_GOTO_SURAH, ACT_LIGHT,
        ACT_ZOOM0 = 20, ACT_THEME0 = 40 };
 
-static char s_zoom_labels[5][16];
-static char s_theme_labels[THEME_N][28];
+static char s_zoom_labels[QD_ZOOMS][24];
+static char s_theme_labels[THEME_N][48];
 
 static void act_noop(ActionMenu *m, const ActionMenuItem *a, void *c) {}
 
@@ -301,25 +305,25 @@ static void open_action_menu(void) {
     return;
   }
   bool bm = bookmark_find(s_top.g) >= 0;
-  action_menu_level_add_action(root, bm ? "Remove bookmark" : "Bookmark this ayah", act_noop, (void *)ACT_BOOKMARK);
-  action_menu_level_add_action(root, "Translation", act_noop, (void *)ACT_TRANSLATION);
+  action_menu_level_add_action(root, _(bm ? S_BOOKMARK_REMOVE : S_BOOKMARK_ADD), act_noop, (void *)ACT_BOOKMARK);
+  action_menu_level_add_action(root, _(S_TRANSLATION), act_noop, (void *)ACT_TRANSLATION);
   if (ui_system_arabic_available())
-    action_menu_level_add_action(root, g_set.font == FONT_SYSTEM ? "Use Quran font" : "Use system font",
+    action_menu_level_add_action(root, _(g_set.font == FONT_SYSTEM ? S_USE_QURAN_FONT : S_USE_SYSTEM_FONT),
                                  act_noop, (void *)ACT_FONT);
-  action_menu_level_add_action(root, "Go to ayah", act_noop, (void *)ACT_GOTO_AYAH);
-  action_menu_level_add_action(root, "Go to surah", act_noop, (void *)ACT_GOTO_SURAH);
+  action_menu_level_add_action(root, _(S_GOTO_AYAH), act_noop, (void *)ACT_GOTO_AYAH);
+  action_menu_level_add_action(root, _(S_GOTO_SURAH), act_noop, (void *)ACT_GOTO_SURAH);
   for (int z = 0; z < QD_ZOOMS; z++) {
     snprintf(s_zoom_labels[z], sizeof(s_zoom_labels[z]), "%d px%s", qmeta_zoom(z)->ppem,
-             z == g_set.zoom ? " (now)" : "");
+             z == g_set.zoom ? _(S_NOW) : "");
     action_menu_level_add_action(sizes, s_zoom_labels[z], act_noop, (void *)(intptr_t)(ACT_ZOOM0 + z));
   }
-  action_menu_level_add_child(root, sizes, "Text size");
+  action_menu_level_add_child(root, sizes, _(S_TEXT_SIZE));
   for (int t = 0; t < THEME_N; t++) {
-    snprintf(s_theme_labels[t], sizeof(s_theme_labels[t]), "%s%s", theme_name(t), t == g_set.theme ? " (now)" : "");
+    snprintf(s_theme_labels[t], sizeof(s_theme_labels[t]), "%s%s", theme_name(t), t == g_set.theme ? _(S_NOW) : "");
     action_menu_level_add_action(themes, s_theme_labels[t], act_noop, (void *)(intptr_t)(ACT_THEME0 + t));
   }
-  action_menu_level_add_child(root, themes, "Theme");
-  action_menu_level_add_action(root, ui_backlight_is_on() ? "Backlight off" : "Backlight on", act_noop,
+  action_menu_level_add_child(root, themes, _(S_THEME));
+  action_menu_level_add_action(root, _(ui_backlight_is_on() ? S_BACKLIGHT_OFF : S_BACKLIGHT_ON), act_noop,
                                (void *)ACT_LIGHT);
   ActionMenuConfig cfg = ui_action_menu_config(root, menu_closed);
   action_menu_open(&cfg);

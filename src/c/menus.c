@@ -10,6 +10,7 @@
 #include "strips.h"
 #include "qrender.h"
 #include "names_ar.h"
+#include "i18n.h"
 
 // All lists are standard MenuLayers drawn with menu_cell_basic_draw. Windows
 // are created once and kept, so popping one from inside its own callback never
@@ -23,7 +24,7 @@ typedef struct ListWin {
   void (*select)(int row);
   void (*select_long)(int row);
   int (*initial)(void);                 // row to select when shown, -1 to keep
-  const char *header;                   // optional section header
+  const char *(*header)(void);          // optional section header
   int16_t cell_h;                       // 0 = default height
 } ListWin;
 
@@ -33,7 +34,7 @@ static int16_t lw_header_h(MenuLayer *m, uint16_t s, void *c) {
   return ((ListWin *)c)->header ? MENU_CELL_BASIC_HEADER_HEIGHT : 0;
 }
 static void lw_draw_header(GContext *ctx, const Layer *cell, uint16_t s, void *c) {
-  if (((ListWin *)c)->header) menu_cell_basic_header_draw(ctx, cell, ((ListWin *)c)->header);
+  if (((ListWin *)c)->header) menu_cell_basic_header_draw(ctx, cell, ((ListWin *)c)->header());
 }
 static void lw_draw(GContext *ctx, const Layer *cell, MenuIndex *i, void *c) { ((ListWin *)c)->draw(ctx, cell, i->row); }
 static int16_t lw_cell_h(MenuLayer *m, MenuIndex *i, void *c) {
@@ -81,7 +82,7 @@ static void lw_reload(ListWin *lw) { if (lw->menu) menu_layer_reload_data(lw->me
 
 static void pos_text(uint16_t g, char *buf, int n) {
   int si = qmeta_surah_of(g);
-  snprintf(buf, n, "%s %d:%d", qmeta_surah(si)->translit, si + 1, qmeta_ayah_no(g));
+  snprintf(buf, n, "%s %d:%d", i18n_surah_name(si), si + 1, qmeta_ayah_no(g));
 }
 
 // ---------------------------------------------------------------- surahs
@@ -127,8 +128,8 @@ static bool s_part_hizb;
 static uint16_t part_rows(void) { return s_part_hizb ? QD_N_HIZB : QD_N_JUZ; }
 static uint16_t part_start(int row) { return s_part_hizb ? qmeta_hizb_start(row) : qmeta_juz_start(row); }
 static void part_draw(GContext *ctx, const Layer *cell, int row) {
-  char t[16], sub[32];
-  snprintf(t, sizeof(t), "%s %d", s_part_hizb ? "Hizb" : "Juz'", row + 1);
+  char t[24], sub[40];
+  snprintf(t, sizeof(t), _(s_part_hizb ? S_HIZB_N : S_JUZ_N), row + 1);
   pos_text(part_start(row), sub, sizeof(sub));
   menu_cell_basic_draw(ctx, cell, t, sub, NULL);
 }
@@ -142,14 +143,15 @@ static int s_bm_pending = -1;
 static uint16_t bm_rows(void) { return bookmarks_count() ? bookmarks_count() : 1; }
 static void bm_draw(GContext *ctx, const Layer *cell, int row) {
   if (!bookmarks_count()) {
-    menu_cell_basic_draw(ctx, cell, "No bookmarks", "Add one from the reader menu", NULL);
+    menu_cell_basic_draw(ctx, cell, _(S_NO_BOOKMARKS), _(S_NO_BOOKMARKS_SUB), NULL);
     return;
   }
   uint16_t g = bookmark_get(row);
   int si = qmeta_surah_of(g);
-  char sub[24];
-  snprintf(sub, sizeof(sub), "%d:%d  Juz' %d", si + 1, qmeta_ayah_no(g), qmeta_juz_of(g) + 1);
-  menu_cell_basic_draw(ctx, cell, qmeta_surah(si)->translit, sub, NULL);
+  char juz[24], sub[40];
+  snprintf(juz, sizeof(juz), _(S_JUZ_N), qmeta_juz_of(g) + 1);
+  snprintf(sub, sizeof(sub), "%d:%d  %s", si + 1, qmeta_ayah_no(g), juz);
+  menu_cell_basic_draw(ctx, cell, i18n_surah_name(si), sub, NULL);
 }
 static void bm_select(int row) { if (bookmarks_count()) reader_jump_to(bookmark_get(row)); }
 static ListWin s_bms;
@@ -165,8 +167,8 @@ static void bm_long(int row) {
   if (!bookmarks_count()) return;
   s_bm_pending = row;
   ActionMenuLevel *root = action_menu_level_create(2);
-  action_menu_level_add_action(root, "Open", bm_menu_noop, (void *)1);
-  action_menu_level_add_action(root, "Delete bookmark", bm_menu_noop, (void *)2);
+  action_menu_level_add_action(root, _(S_OPEN), bm_menu_noop, (void *)1);
+  action_menu_level_add_action(root, _(S_DELETE_BOOKMARK), bm_menu_noop, (void *)2);
   ActionMenuConfig cfg = ui_action_menu_config(root, bm_menu_closed);
   action_menu_open(&cfg);
 }
@@ -179,7 +181,7 @@ void goto_ayah_push(int si) {
 
 // ---------------------------------------------------------------- settings
 typedef struct {
-  const char *title;
+  uint16_t title;                       // string id
   int n;
   const char *(*label)(int i);
   uint8_t *field;
@@ -190,55 +192,59 @@ static const char *zoom_label(int i) {
   snprintf(s_zoom_lbl[i], sizeof(s_zoom_lbl[i]), "%d px", qmeta_zoom(i)->ppem);
   return s_zoom_lbl[i];
 }
-static const char *font_label(int i) { return i == FONT_SYSTEM ? "System font" : "Quran font"; }
-static const char *sysfont_label(int i) { return i ? "Large (28)" : "Medium (24)"; }
-static const char *scroll_label(int i) { return i == SCROLL_PAGE ? "By page" : "By line"; }
-static const char *render_label(int i) { return i == RENDER_WATCH ? "Watch only" : "Phone when connected"; }
-static const char *glance_label(int i) { return i ? "On" : "Off"; }
+static const char *font_label(int i) { return _(i == FONT_SYSTEM ? S_SYSTEM_FONT : S_QURAN_FONT); }
+static const char *sysfont_label(int i) { return _(i ? S_LARGE_28 : S_MEDIUM_24); }
+static const char *scroll_label(int i) { return _(i == SCROLL_PAGE ? S_BY_PAGE : S_BY_LINE); }
+static const char *render_label(int i) { return _(i == RENDER_WATCH ? S_WATCH_ONLY : S_PHONE_WHEN_CONNECTED); }
+static const char *glance_label(int i) { return _(i ? S_ON : S_OFF); }
 
 enum { SET_ZOOM, SET_FONT, SET_SYSFONT, SET_SCROLL, SET_HEADER, SET_THEME, SET_LIGHT, SET_TRANS,
-       SET_RENDER, SET_GLANCE, SET_STATUS, SET_RESET, SET_ABOUT, SET_N };
+       SET_RENDER, SET_GLANCE, SET_LANG, SET_STATUS, SET_RESET, SET_ABOUT, SET_N };
 
 static const Choice CHOICES[] = {
-  [SET_ZOOM] = { "Text size", QD_ZOOMS, zoom_label, &g_set.zoom },
-  [SET_FONT] = { "Arabic text", FONT_N, font_label, &g_set.font },
-  [SET_SYSFONT] = { "System font size", SYSFONT_N, sysfont_label, &g_set.sysfont },
-  [SET_SCROLL] = { "Scrolling", SCROLL_N, scroll_label, &g_set.scroll },
-  [SET_HEADER] = { "Header", HEADER_N, header_name, &g_set.header },
-  [SET_THEME] = { "Theme", THEME_N, theme_name, &g_set.theme },
-  [SET_LIGHT] = { "Backlight colour", LIGHT_N, light_name, &g_set.light },
-  [SET_TRANS] = { "Translation", TRANS_N, trans_name, &g_set.trans },
-  [SET_RENDER] = { "Rendering", RENDER_N, render_label, &g_set.render },
-  [SET_GLANCE] = { "Position in app list", 2, glance_label, &g_set.glance },
+  [SET_ZOOM] = { S_TEXT_SIZE, QD_ZOOMS, zoom_label, &g_set.zoom },
+  [SET_FONT] = { S_ARABIC_TEXT, FONT_N, font_label, &g_set.font },
+  [SET_SYSFONT] = { S_SYSFONT_SIZE, SYSFONT_N, sysfont_label, &g_set.sysfont },
+  [SET_SCROLL] = { S_SCROLLING, SCROLL_N, scroll_label, &g_set.scroll },
+  [SET_HEADER] = { S_HEADER, HEADER_N, header_name, &g_set.header },
+  [SET_THEME] = { S_THEME, THEME_N, theme_name, &g_set.theme },
+  [SET_LIGHT] = { S_BACKLIGHT, LIGHT_N, light_name, &g_set.light },
+  [SET_TRANS] = { S_TRANSLATION, TRANS_N, trans_name, &g_set.trans },
+  [SET_RENDER] = { S_RENDERING, RENDER_N, render_label, &g_set.render },
+  [SET_GLANCE] = { S_GLANCE, 2, glance_label, &g_set.glance },
+  [SET_LANG] = { S_LANGUAGE, LANG_N, i18n_lang_name, &g_lang },
 };
 
 static const Choice *s_choice;
 static ListWin s_settings, s_choices;
 
 static uint16_t choice_rows(void) { return (uint16_t)s_choice->n; }
+static const char *choice_header(void) { return _(s_choice->title); }
 static void choice_draw(GContext *ctx, const Layer *cell, int row) {
-  menu_cell_basic_draw(ctx, cell, s_choice->label(row), row == *s_choice->field ? "Selected" : NULL, NULL);
+  menu_cell_basic_draw(ctx, cell, s_choice->label(row), row == *s_choice->field ? _(S_SELECTED) : NULL, NULL);
 }
 static void choice_select(int row) {
   *s_choice->field = (uint8_t)row;
   state_save_settings();
   comm_send_settings();
+  i18n_update();
   reader_settings_changed();
   textview_settings_changed();
   window_stack_pop(true);
 }
 static int choice_initial(void) { return *s_choice->field; }
-static ListWin s_choices = { .rows = choice_rows, .draw = choice_draw, .select = choice_select, .initial = choice_initial };
+static ListWin s_choices = { .rows = choice_rows, .draw = choice_draw, .select = choice_select, .initial = choice_initial,
+                             .header = choice_header };
 
 static uint16_t set_rows(void) { return SET_N; }
 static void set_draw(GContext *ctx, const Layer *cell, int row) {
-  char sub[40];
+  char sub[64];
   if (row < SET_STATUS) {
     const Choice *c = &CHOICES[row];
     const char *v = c->label(*c->field);
-    if (row == SET_FONT && !ui_system_arabic_available()) v = "Quran font (no system Arabic)";
-    if (row == SET_LIGHT) { snprintf(sub, sizeof(sub), "%s, hold Select", v); v = sub; }
-    menu_cell_basic_draw(ctx, cell, c->title, v, NULL);
+    if (row == SET_FONT && !ui_system_arabic_available()) v = _(S_QURAN_FONT_NO_AR);
+    if (row == SET_LIGHT) { snprintf(sub, sizeof(sub), _(S_HOLD_SELECT), v); v = sub; }
+    menu_cell_basic_draw(ctx, cell, _(c->title), v, NULL);
     return;
   }
   switch (row) {
@@ -246,29 +252,32 @@ static void set_draw(GContext *ctx, const Layer *cell, int row) {
       {
         uint32_t np, nw;
         source_counts(&np, &nw);
-        char title[32];
-        snprintf(title, sizeof(title), "Status (%lu/%lu)", (unsigned long)np, (unsigned long)nw);
-        snprintf(sub, sizeof(sub), "Renders on: %s", source_status());
+        char title[48];
+        snprintf(title, sizeof(title), _(S_STATUS), (unsigned long)np, (unsigned long)nw);
+        snprintf(sub, sizeof(sub), _(S_RENDERS_ON), source_status());
         menu_cell_basic_draw(ctx, cell, title, sub, NULL);
       }
       break;
-    case SET_RESET: menu_cell_basic_draw(ctx, cell, "Reset settings", "Keeps position, bookmarks", NULL); break;
-    case SET_ABOUT:
-      snprintf(sub, sizeof(sub), "v2.0  %u KB free", (unsigned)(heap_bytes_free() / 1024));
-      menu_cell_basic_draw(ctx, cell, "About", sub, NULL);
+    case SET_RESET: menu_cell_basic_draw(ctx, cell, _(S_RESET_SETTINGS), _(S_RESET_SUB), NULL); break;
+    case SET_ABOUT: {
+      char kb[40];
+      snprintf(kb, sizeof(kb), _(S_KB_FREE), (unsigned)(heap_bytes_free() / 1024));
+      snprintf(sub, sizeof(sub), "v2.0  %s", kb);
+      menu_cell_basic_draw(ctx, cell, _(S_ABOUT), sub, NULL);
       break;
+    }
   }
 }
 static void set_select(int row) {
   if (row < SET_STATUS) {
     s_choice = &CHOICES[row];
-    s_choices.header = s_choice->title;
     lw_push(&s_choices);
     return;
   }
   if (row == SET_RESET) {
     settings_reset();
     comm_send_settings();
+    i18n_update();
     reader_settings_changed();
     vibes_short_pulse();
     lw_appear(s_settings.win);
@@ -282,20 +291,20 @@ enum { MM_CONTINUE, MM_SURAHS, MM_JUZ, MM_HIZB, MM_BOOKMARKS, MM_SETTINGS, MM_N 
 
 static uint16_t mm_rows(void) { return MM_N; }
 static void mm_draw(GContext *ctx, const Layer *cell, int row) {
-  char sub[40];
+  char sub[48];
   switch (row) {
     case MM_CONTINUE:
       pos_text(g_pos.ayah, sub, sizeof(sub));
-      menu_cell_basic_draw(ctx, cell, "Continue reading", sub, NULL);
+      menu_cell_basic_draw(ctx, cell, _(S_CONTINUE), sub, NULL);
       break;
-    case MM_SURAHS: menu_cell_basic_draw(ctx, cell, "Surahs", "Pick a surah, then the ayah", NULL); break;
-    case MM_JUZ: menu_cell_basic_draw(ctx, cell, "Juz'", "30 parts", NULL); break;
-    case MM_HIZB: menu_cell_basic_draw(ctx, cell, "Hizb", "60 parts", NULL); break;
+    case MM_SURAHS: menu_cell_basic_draw(ctx, cell, _(S_SURAHS), _(S_SURAHS_SUB), NULL); break;
+    case MM_JUZ: menu_cell_basic_draw(ctx, cell, _(S_JUZ), _(S_JUZ_SUB), NULL); break;
+    case MM_HIZB: menu_cell_basic_draw(ctx, cell, _(S_HIZB), _(S_HIZB_SUB), NULL); break;
     case MM_BOOKMARKS:
-      snprintf(sub, sizeof(sub), "%d saved", bookmarks_count());
-      menu_cell_basic_draw(ctx, cell, "Bookmarks", sub, NULL);
+      snprintf(sub, sizeof(sub), _(S_BOOKMARKS_N), bookmarks_count());
+      menu_cell_basic_draw(ctx, cell, _(S_BOOKMARKS), sub, NULL);
       break;
-    case MM_SETTINGS: menu_cell_basic_draw(ctx, cell, "Settings", NULL, NULL); break;
+    case MM_SETTINGS: menu_cell_basic_draw(ctx, cell, _(S_SETTINGS), NULL, NULL); break;
   }
 }
 static void mm_select(int row) {
@@ -313,6 +322,6 @@ static ListWin s_main = { .rows = mm_rows, .draw = mm_draw, .select = mm_select 
 void main_menu_push(void) { lw_push(&s_main); }
 
 void main_menu_refresh(void) {
-  lw_reload(&s_main);
-  lw_reload(&s_settings);
+  ListWin *all[] = { &s_main, &s_settings, &s_choices, &s_surahs, &s_parts, &s_bms };
+  for (unsigned i = 0; i < ARRAY_LENGTH(all); i++) lw_reload(all[i]);
 }

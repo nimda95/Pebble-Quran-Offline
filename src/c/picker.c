@@ -2,6 +2,7 @@
 #include "qdata.h"
 #include "reader.h"
 #include "ui.h"
+#include "i18n.h"
 
 #define PAD_TOP 84
 #define ROWS 4
@@ -15,7 +16,7 @@ static int s_surah, s_value, s_max;
 static bool s_fresh;                  // next typed digit replaces the value
 static int s_pressed = -1;            // key shown pressed after a tap
 static AppTimer *s_press_timer;
-static char s_title_buf[24], s_number_buf[8], s_hint_buf[64];
+static char s_title_buf[40], s_number_buf[8], s_hint_buf[128];
 
 static void refresh(void) {
   if (s_value > 0) snprintf(s_number_buf, sizeof(s_number_buf), "%d", s_value);
@@ -63,8 +64,9 @@ static GRect key_rect(int key) {
 }
 
 static void pad_draw(Layer *l, GContext *ctx) {
-  static const char *LABELS[ROWS * COLS] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "Del", "0", "Go" };
+  static const char *LABELS[ROWS * COLS] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", NULL, "0", NULL };
   for (int k = 0; k < ROWS * COLS; k++) {
+    const char *label = k == KEY_DEL ? _(S_KEY_DEL) : k == KEY_GO ? _(S_KEY_GO) : LABELS[k];
     GRect r = key_rect(k);
     bool on = k == s_pressed;
     bool go_key = k == KEY_GO;
@@ -73,7 +75,7 @@ static void pad_draw(Layer *l, GContext *ctx) {
     graphics_context_set_text_color(ctx, (on || go_key) ? GColorWhite : GColorBlack);
     GFont f = fonts_get_system_font(k >= KEY_DEL && k != KEY_ZERO ? FONT_KEY_GOTHIC_18_BOLD : FONT_KEY_GOTHIC_24_BOLD);
     int th = k >= KEY_DEL && k != KEY_ZERO ? 18 : 24;
-    graphics_draw_text(ctx, LABELS[k], f, GRect(r.origin.x, r.origin.y + (r.size.h - th) / 2 - 4, r.size.w, th + 6),
+    graphics_draw_text(ctx, label, f, GRect(r.origin.x, r.origin.y + (r.size.h - th) / 2 - 4, r.size.w, th + 6),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
   }
 }
@@ -150,7 +152,7 @@ void picker_push(int si, int initial) {
   s_pressed = -1;
   if (window_stack_contains_window(s_win)) window_stack_remove(s_win, false);
   window_stack_push(s_win, true);
-  snprintf(s_title_buf, sizeof(s_title_buf), "%d. %s", si + 1, s->translit);
+  snprintf(s_title_buf, sizeof(s_title_buf), "%d. %s", si + 1, i18n_surah_name(si));
   // numpad only when touch input reaches apps; otherwise a buttons-only layout
   bool touch = ui_touch_available();
   GRect b = layer_get_bounds(window_get_root_layer(s_win));
@@ -158,8 +160,9 @@ void picker_push(int si, int initial) {
   layer_set_frame(text_layer_get_layer(s_title), GRect(4, touch ? 0 : 36, b.size.w - 8, 24));
   layer_set_frame(text_layer_get_layer(s_number), GRect(0, touch ? 18 : 74, b.size.w, 48));
   layer_set_frame(text_layer_get_layer(s_hint), GRect(4, touch ? 64 : 126, b.size.w - 8, touch ? 18 : 60));
-  if (touch) snprintf(s_hint_buf, sizeof(s_hint_buf), "Ayah 1 to %d", s_max);
-  else snprintf(s_hint_buf, sizeof(s_hint_buf), "Ayah 1 to %d\nUp/Down to change\nSelect to open", s_max);
+  int n = snprintf(s_hint_buf, sizeof(s_hint_buf), _(S_AYAH_RANGE), s_max);
+  if (!touch && n > 0 && n < (int)sizeof(s_hint_buf))
+    snprintf(s_hint_buf + n, sizeof(s_hint_buf) - n, "\n%s", _(S_PICKER_HELP));
   text_layer_set_text(s_title, s_title_buf);
   text_layer_set_text(s_hint, s_hint_buf);
   refresh();
